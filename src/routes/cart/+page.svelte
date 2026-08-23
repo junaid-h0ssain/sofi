@@ -1,3 +1,10 @@
+<!--
+  CART PAGE — line items on the left, sticky order summary on the right.
+
+  Note how each cart row contains THREE tiny forms (setQuantity, remove) —
+  that's the SvelteKit way: every button is a real form posting to a server
+  action. No client state to keep in sync.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
@@ -9,12 +16,15 @@
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
 	import ShoppingCartIcon from '@lucide/svelte/icons/shopping-cart';
 	import { formatMoney } from '$lib/utils/money';
+	// Shared shipping rules so this page always matches checkout exactly.
+	import { calcShippingCents } from '$lib/utils/pricing';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	const shippingCents = $derived(data.totalCents >= 5000 || data.totalCents === 0 ? 0 : 499);
+	const shippingCents = $derived(calcShippingCents(data.totalCents));
 
+	/** Show failures (e.g. "Cart item not found") as a toast after update. */
 	function onQuantityResult(result: { type: string; data?: Record<string, unknown> }): Promise<void> | void {
 		if (result.type === 'failure' && result.data?.message) {
 			toast.error(String(result.data.message));
@@ -28,6 +38,7 @@
 	<h1 class="mb-6 text-2xl font-semibold tracking-tight">Your cart</h1>
 
 	{#if data.items.length === 0}
+		<!-- Empty state -->
 		<Card.Root class="p-12 text-center">
 			<ShoppingCartIcon class="text-muted-foreground mx-auto mb-4 size-10" />
 			<p class="font-medium">Your cart is empty</p>
@@ -98,6 +109,7 @@
 				</form>
 			</div>
 
+			<!-- Sticky summary stays visible while scrolling long carts -->
 			<Card.Root class="h-fit p-6 lg:sticky lg:top-20">
 				<h2 class="font-semibold">Order summary</h2>
 				<Separator class="my-4" />

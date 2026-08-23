@@ -1,3 +1,8 @@
+<!--
+  ADMIN LAYOUT — section title + tab-like navigation between admin pages.
+  The active tab highlights by comparing against the current URL
+  ($app/state gives reactive access to the current page object).
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';

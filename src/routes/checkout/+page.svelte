@@ -1,5 +1,11 @@
+<!--
+  CHECKOUT PAGE — address form on the left, order summary on the right.
+  Submitting posts to the `?/placeOrder` action which performs the atomic
+  batch write and redirects to the order confirmation page.
+-->
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -31,8 +37,9 @@
 					submitting = true;
 					return async ({ result, update }) => {
 						submitting = false;
+						// Redirects are handled by update(); we only surface failures.
 						if (result.type === 'failure' && result.data?.message) {
-							console.error(result.data.message);
+							toast.error(String(result.data.message));
 						}
 						await update();
 					};
@@ -69,6 +76,7 @@
 
 				<Separator />
 
+				<!-- In a real shop this is where Stripe/PayPal would live. -->
 				<div class="rounded-lg border border-dashed p-4">
 					<div class="flex items-center justify-between">
 						<p class="text-sm font-medium">Payment</p>
@@ -85,6 +93,7 @@
 			</form>
 		</Card.Root>
 
+		<!-- Order summary mirrors the cart page -->
 		<Card.Root class="h-fit p-6 lg:sticky lg:top-20">
 			<h2 class="font-semibold">Your order</h2>
 			<Separator class="my-4" />

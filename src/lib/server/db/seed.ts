@@ -1,6 +1,20 @@
 /**
- * Seed script — run with `bun run db:seed`.
- * Idempotent: uses fixed IDs + onConflictDoUpdate, safe to re-run anytime.
+ * ============================================================================
+ * SEED SCRIPT — fill the store with realistic demo data
+ * ============================================================================
+ *
+ * Run with:  bun run db:seed
+ *
+ * The script is IDEMPOTENT, meaning you can run it as many times as you like
+ * without creating duplicates or errors. Two tricks make that work:
+ *
+ *   1. Fixed IDs ('brand_apple', 'prod_mbair-m3'…) instead of random UUIDs.
+ *   2. Upserts via `.onConflictDoUpdate` — "insert this row, but if a row with
+ *      the same primary key already exists, just update it instead."
+ *
+ * It creates its own database connection (instead of importing $lib/server/db)
+ * so it can run standalone with Bun, outside of SvelteKit. Bun automatically
+ * loads the .env file, which is where DATABASE_URL comes from.
  */
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
@@ -9,6 +23,8 @@ import { brand, category, product } from './schema';
 
 const client = neon(process.env.DATABASE_URL ?? '');
 const db = drizzle(client);
+
+/* ------------------------------ brands ---------------------------------- */
 
 const brands = [
 	{ id: 'brand_apple', name: 'Apple', slug: 'apple' },
@@ -21,6 +37,10 @@ const brands = [
 	{ id: 'brand_garmin', name: 'Garmin', slug: 'garmin' }
 ];
 
+/*
+ * Category slugs are important: the UI looks up placeholder images at
+ * /static/products/<slug>.svg, so slug 'laptop' ↔ laptop.svg must match.
+ */
 const categories = [
 	{ id: 'cat_laptop', name: 'Laptops', slug: 'laptop' },
 	{ id: 'cat_phone', name: 'Phones', slug: 'phone' },
@@ -32,14 +52,16 @@ const categories = [
 	{ id: 'cat_tv', name: 'TVs', slug: 'tv' }
 ];
 
+/* ----------------------------- products --------------------------------- */
+
 interface SeedProduct {
 	id: string;
 	name: string;
 	description: string;
-	priceCents: number;
+	priceCents: number; // remember: dollars × 100
 	stock: number;
-	featured?: boolean;
-	specs: Record<string, string>;
+	featured?: boolean; // shown on the homepage
+	specs: Record<string, string>; // flexible JSONB key/values
 	brandId: string;
 	categoryId: string;
 }
@@ -424,12 +446,13 @@ async function main() {
 	if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
 	console.log(`Seeding ${brands.length} brands, ${categories.length} categories, ${products.length} products…`);
 
+	// --- Brands & categories: insert or update by fixed id -------------------
 	await db
 		.insert(brand)
 		.values(brands)
 		.onConflictDoUpdate({
-			target: brand.id,
-			set: { name: sql`excluded.name`, slug: sql`excluded.slug` }
+			target: brand.id, // "conflict" = same primary key already exists
+			set: { name: sql`excluded.name`, slug: sql`excluded.slug` } // excluded.* = the values we TRIED to insert
 		});
 
 	await db
@@ -440,6 +463,8 @@ async function main() {
 			set: { name: sql`excluded.name`, slug: sql`excluded.slug` }
 		});
 
+	// --- Products -------------------------------------------------------------
+	// The image URL is derived from the category slug, e.g. router → /products/router.svg
 	await db
 		.insert(product)
 		.values(
@@ -459,6 +484,7 @@ async function main() {
 		)
 		.onConflictDoUpdate({
 			target: product.id,
+			// Note: SQL column names (snake_case) in the excluded.* references!
 			set: {
 				name: sql`excluded.name`,
 				slug: sql`excluded.slug`,

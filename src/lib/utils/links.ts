@@ -1,7 +1,15 @@
 import { resolve } from '$app/paths';
 
 /**
- * Central route helpers so links stay consistent and respect `paths.base`.
+ * Central route helpers so links stay consistent across the app.
+ *
+ * Why not just write href="/products"? SvelteKit apps can be deployed under
+ * a sub-path (e.g. example.com/shop/). The `resolve()` helper prepends that
+ * base path automatically, so links keep working anywhere.
+ *
+ * Usage:
+ *   resolve('/products')                     → static route
+ *   resolve('/products/[slug]', { slug })    → dynamic route with params
  */
 export const Link = {
 	home: () => resolve('/'),

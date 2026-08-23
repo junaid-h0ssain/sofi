@@ -1,3 +1,4 @@
+<!-- Simple footer with a few links. new Date() gives the current year. -->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Separator } from '$lib/components/ui/separator/index.js';

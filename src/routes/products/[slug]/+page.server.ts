@@ -1,3 +1,10 @@
+/**
+ * PRODUCT DETAIL PAGE (/products/[slug]) — server side.
+ *
+ * `[slug]` is a dynamic route segment: whatever sits there in the URL arrives
+ * as `params.slug`. Unknown slug → error(404), which SvelteKit renders with
+ * its built-in error page.
+ */
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getProductBySlug, getRelatedProducts } from '$lib/server/catalog';
@@ -12,7 +19,9 @@ export const load: PageServerLoad = async ({ params }) => {
 };
 
 export const actions: Actions = {
+	/** "Add to cart" button on the detail page. */
 	addToCart: async (event) => {
+		// Adding to a cart obviously requires being logged in.
 		const user = event.locals.user;
 		if (!user) redirect(302, '/login');
 
@@ -30,6 +39,8 @@ export const actions: Actions = {
 			return fail(400, { message: 'Could not add to cart' });
 		}
 
+		// Returning success (not a redirect!) keeps the shopper on the page —
+		// the client shows a toast and the header cart badge refreshes.
 		return { success: true as const };
 	}
 };

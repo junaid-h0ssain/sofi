@@ -1,3 +1,17 @@
+<!--
+  ============================================================================
+  PRODUCT FORM — shared by admin "new" and "edit" pages
+  ============================================================================
+  One component, two uses:
+    - new:     no `product` prop → blank fields, posts to ?/create
+    - edit:    `product` prop → pre-filled fields, posts to ?/update
+  The parent chooses the destination with the `action` prop.
+
+  Notable bits:
+   - Select dropdowns use bind:value (two-way binding) so we can show the
+     selected label on the trigger button.
+   - Specs are edited as plain text lines and parsed server-side.
+-->
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -16,6 +30,7 @@
 	interface Props {
 		brands: Option[];
 		categories: Option[];
+		/** Where the form POSTs to: '?/create' or '?/update'. */
 		action: string;
 		product?: {
 			name: string;
@@ -41,7 +56,9 @@
 		submitLabel = 'Save product'
 	}: Props = $props();
 
-	// Intentional initial-only values: the form remounts per route, product never changes after load.
+	// Initial values for the dropdowns & checkbox. Intentionally captured ONCE:
+	// the form remounts per route, `product` never changes during its lifetime.
+	// (svelte-ignore silences the compiler warning that would otherwise fire.)
 	// svelte-ignore state_referenced_locally
 	let brandId = $state(product?.brandId ?? '');
 	// svelte-ignore state_referenced_locally
@@ -49,6 +66,7 @@
 	// svelte-ignore state_referenced_locally
 	let featuredChecked = $state(product?.featured === 1);
 
+	// JSONB object → "Key: Value" lines for the textarea.
 	// svelte-ignore state_referenced_locally
 	const specsText = product ? Object.entries(product.specs).map(([k, v]) => `${k}: ${v}`).join('\n') : '';
 </script>
@@ -65,6 +83,8 @@
 				<Input id="name" name="name" required value={product?.name ?? ''} />
 			</div>
 
+			<!-- bits-ui Select renders a hidden <input name=…> so these submit
+			     like normal form fields — no JS wiring needed on the server. -->
 			<div class="flex flex-col gap-2">
 				<Label for="brandId">Brand</Label>
 				<Select.Root type="single" name="brandId" bind:value={brandId} required>
@@ -89,6 +109,7 @@
 				</Select.Root>
 			</div>
 
+			<!-- Price is typed in DOLLARS; parseProductForm converts to cents -->
 			<div class="flex flex-col gap-2">
 				<Label for="price">Price ($)</Label>
 				<Input id="price" name="price" type="number" min="0" step="0.01" required value={product ? (product.priceCents / 100).toFixed(2) : ''} />

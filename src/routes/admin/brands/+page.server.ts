@@ -1,3 +1,8 @@
+/**
+ * ADMIN BRANDS — read list + create/delete actions.
+ * Deleting is only allowed while a brand has zero products (the FK would
+ * otherwise reject it; we check the count in the UI and catch SQL errors).
+ */
 import { asc, count, eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
@@ -28,6 +33,7 @@ export const actions: Actions = {
 		try {
 			await db.insert(brand).values({ id: crypto.randomUUID(), name, slug });
 		} catch {
+			// unique index on slug rejected it
 			return fail(400, { message: 'A brand with this name already exists' });
 		}
 

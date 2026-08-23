@@ -1,17 +1,15 @@
+<!--
+  ADMIN PRODUCTS LIST — data table with edit links and a delete button
+  per row. The delete uses window.confirm() BEFORE the request is even sent:
+  `enhance` gives us a cancel() to stop the submission when the admin says no.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import {
-		Table,
-		TableBody,
-		TableCell,
-		TableHead,
-		TableHeader,
-		TableRow
-	} from '$lib/components/ui/table/index.js';
+	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table/index.js';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
@@ -20,6 +18,7 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
+	// $effect runs after DOM updates — perfect for reacting to action results.
 	$effect(() => {
 		if (form?.deleted) toast.success('Product deleted');
 		else if (form?.message) toast.error(form.message);
@@ -69,6 +68,7 @@
 								method="POST"
 								action="?/delete"
 								use:enhance={({ cancel }) => {
+									// Ask before destroying data; cancel() aborts the submit.
 									if (!window.confirm(`Delete "${p.name}"? This cannot be undone.`)) cancel();
 									return async ({ update }) => update();
 								}}
@@ -84,8 +84,4 @@
 			</TableBody>
 		</Table>
 	</div>
-{/if}
-
-{#if form?.message && !form.deleted}
-	<p class="text-destructive mt-3 text-sm">{form.message}</p>
 {/if}

@@ -1,3 +1,7 @@
+/**
+ * NEW PRODUCT — supplies the form's dropdown options and handles creation.
+ * Parsing/validation lives in $lib/server/product-form.ts, shared with edit.
+ */
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getBrands, getCategoriesWithCounts } from '$lib/server/catalog';
@@ -19,6 +23,7 @@ export const actions: Actions = {
 		try {
 			await db.insert(product).values({ id: crypto.randomUUID(), ...parsed.data });
 		} catch {
+			// Most likely cause: slug already exists (unique index).
 			return fail(400, { message: 'Could not create product (slug may already exist)' });
 		}
 

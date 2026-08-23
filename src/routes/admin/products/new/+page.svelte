@@ -1,3 +1,8 @@
+<!--
+  NEW PRODUCT — reuses the shared <ProductForm> component.
+  Compare with ../[id]/+page.svelte: identical page except we pass no
+  `product` prop (blank form) and a different action name.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import ProductForm from '$lib/components/admin/product-form.svelte';

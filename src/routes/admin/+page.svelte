@@ -1,3 +1,7 @@
+<!--
+  ADMIN DASHBOARD — stat cards. `stat.icon` renders a component stored in
+  data (Svelte lets you use any expression as a tag with dot notation).
+-->
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';

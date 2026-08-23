@@ -1,3 +1,7 @@
+<!--
+  ADMIN CATEGORIES — mirrors the brands page. Note the <img> preview:
+  /products/{c.slug}.svg proves why slugs must match static file names.
+-->
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { toast } from 'svelte-sonner';

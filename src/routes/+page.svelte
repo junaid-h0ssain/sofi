@@ -1,3 +1,9 @@
+<!--
+  HOMEPAGE — hero banner, category tiles, featured products.
+
+  Data flow: +page.server.ts (this folder) returns { featured } and the root
+  layout contributes { categories }. SvelteKit merges both into `data`.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import ProductCard from '$lib/components/product/product-card.svelte';
@@ -25,6 +31,7 @@
 			<Button size="lg" href={resolve('/products')}>
 				Shop now <ArrowRightIcon class="ml-1 size-4" />
 			</Button>
+			<!-- A link with a query param — this is just the catalog pre-filtered by cheapest-first -->
 			<Button size="lg" variant="outline" href={`${resolve('/products')}?sort=price-asc`}>
 				Best deals
 			</Button>
@@ -32,7 +39,7 @@
 	</div>
 </section>
 
-<!-- Categories -->
+<!-- Categories: one tile per category; slugs match our placeholder SVGs -->
 <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
 	<h2 class="mb-6 text-2xl font-semibold tracking-tight">Shop by category</h2>
 	<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -54,7 +61,7 @@
 	</div>
 </section>
 
-<!-- Featured -->
+<!-- Featured products reuse the same card component as the catalog page -->
 <section class="border-t">
 	<div class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
 		<div class="mb-6 flex items-center justify-between">
