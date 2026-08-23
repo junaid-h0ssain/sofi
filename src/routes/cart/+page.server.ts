@@ -1,47 +1,47 @@
 /**
  * ============================================================================
- * CART PAGE (/cart) — server side
+ * CART PAGE (/cart) — server side (BFF)
  * ============================================================================
- *
- * `load` requires a login (requireUser redirects to /login otherwise) and
- * returns the cart items plus the subtotal.
- *
- * Three named actions handle every mutation from the page:
- *   ?/setQuantity  – number input "Update" button (0 removes the row)
- *   ?/remove       – per-item remove button
- *   ?/clear        – empty the whole cart
+ * Same actions as before, but each mutation is an HTTP call to the .NET API
+ * carrying the shopper's session token.
  */
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/guard';
-import { getCart, getCartTotal, removeCartItem, setCartItemQuantity, clearCart } from '$lib/server/cart';
+import { ApiClientError, cartApi } from '$lib/server/api';
 
 export const load: PageServerLoad = async (event) => {
 	const user = requireUser(event.locals);
-	const items = await getCart(user.id);
+	const items = await cartApi.get(event.locals.sessionToken!);
 
-	return { items, totalCents: getCartTotal(items) };
+	// Subtotal computed from the API's item payloads (same shape as before).
+	const totalCents = items.reduce((sum, i) => sum + i.product.priceCents * i.quantity, 0);
+
+	return { items, totalCents };
 };
 
 export const actions: Actions = {
 	setQuantity: async (event) => {
 		const user = requireUser(event.locals);
+		const token = event.locals.sessionToken!;
+
 		const formData = await event.request.formData();
 		const itemId = String(formData.get('itemId') ?? '');
 		const quantity = Number.parseInt(String(formData.get('quantity') ?? ''), 10);
 
-		if (!itemId || !Number.isInteger(quantity)) return fail(400, { message: 'Invalid request' });
+		if (!itemId || !Number.isInteger(quantity))
+			return fail(400, { message: 'Invalid request' });
 
 		try {
 			if (quantity < 1) {
-				// Typing 0 means "remove" — friendlier than an error.
-				await removeCartItem(user.id, itemId);
+				await cartApi.removeItem(token, itemId); // typing 0 = remove
 			} else {
-				// Throws if the row doesn't belong to this user → shown as a toast.
-				await setCartItemQuantity(user.id, itemId, quantity);
+				await cartApi.setQuantity(token, itemId, quantity);
 			}
 		} catch (err) {
-			return fail(400, { message: err instanceof Error ? err.message : 'Update failed' });
+			const message =
+				err instanceof ApiClientError ? err.message : 'Update failed';
+			return fail(400, { message });
 		}
 
 		return { success: true as const };
@@ -49,18 +49,20 @@ export const actions: Actions = {
 
 	remove: async (event) => {
 		const user = requireUser(event.locals);
+		const token = event.locals.sessionToken!;
+
 		const formData = await event.request.formData();
 		const itemId = String(formData.get('itemId') ?? '');
 
 		if (!itemId) return fail(400, { message: 'Invalid request' });
 
-		await removeCartItem(user.id, itemId);
+		await cartApi.removeItem(token, itemId);
 		return { success: true as const };
 	},
 
 	clear: async (event) => {
 		const user = requireUser(event.locals);
-		await clearCart(user.id);
+		await cartApi.clear(event.locals.sessionToken!);
 		return { success: true as const };
 	}
 };

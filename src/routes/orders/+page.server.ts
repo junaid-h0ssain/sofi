@@ -1,17 +1,13 @@
-import { desc, eq } from 'drizzle-orm';
+/**
+ * ORDERS LIST — order history via the API (ownership enforced server-side).
+ */
 import type { PageServerLoad } from './$types';
 import { requireUser } from '$lib/server/guard';
-import { db } from '$lib/server/db';
-import { order } from '$lib/server/db/schema';
+import { ordersApi } from '$lib/server/api';
 
 export const load: PageServerLoad = async (event) => {
 	const user = requireUser(event.locals);
-
-	const orders = await db
-		.select()
-		.from(order)
-		.where(eq(order.userId, user.id))
-		.orderBy(desc(order.createdAt));
+	const orders = await ordersApi.list(event.locals.sessionToken!);
 
 	return { orders };
 };

@@ -1,12 +1,11 @@
 /**
- * HOMEPAGE data loader.
- * The categories already come from the root layout, so here we only fetch
- * the featured products grid.
+ * HOMEPAGE data loader — featured products now come from the .NET API.
+ * Categories already arrive via the root layout.
  */
 import type { PageServerLoad } from './$types';
-import { getFeaturedProducts } from '$lib/server/catalog';
+import { catalogApi } from '$lib/server/api';
 
 export const load: PageServerLoad = async () => {
-	const featured = await getFeaturedProducts(8);
+	const featured = await catalogApi.featured(8);
 	return { featured };
 };

@@ -1,7 +1,7 @@
 <!--
   ORDER CONFIRMATION / DETAIL PAGE.
-  Doubles as the "thank you" screen right after mock checkout and the
-  reference page reachable later from "My orders".
+  Data shape note: everything now arrives as ONE nested object from the API
+  (data.order with .items inside) instead of two separate props.
 -->
 <script lang="ts">
 	import { resolve } from '$app/paths';
@@ -32,7 +32,7 @@
 
 	// Items subtotal straight from the stored line items.
 	const itemsTotalCents = $derived(
-		data.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
+		data.order.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
 	);
 </script>
 
@@ -58,13 +58,14 @@
 				<p class="text-muted-foreground text-xs uppercase">Order number</p>
 				<p class="font-mono font-medium">{data.order.id}</p>
 			</div>
+			<!-- status arrives as a lowercase string ("paid") from the API -->
 			<Badge variant={statusVariant(data.order.status as OrderStatus)}>{data.order.status}</Badge>
 		</div>
 
 		<Separator class="my-5" />
 
 		<ul class="space-y-4">
-			{#each data.items as item (item.id)}
+			{#each data.order.items as item (item.id)}
 				<li class="flex items-center gap-4">
 					<img
 						src={item.imageUrl ?? '/products/laptop.svg'}

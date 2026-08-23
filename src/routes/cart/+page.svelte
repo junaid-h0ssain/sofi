@@ -58,7 +58,7 @@
 							/>
 						</a>
 						<div class="flex min-w-0 flex-1 flex-col">
-							<p class="text-muted-foreground text-xs uppercase">{item.product.brandName}</p>
+							<p class="text-muted-foreground text-xs uppercase">{item.product.brand.name}</p>
 							<a
 								href={resolve('/products/[slug]', { slug: item.product.slug })}
 								class="truncate font-medium hover:underline"
