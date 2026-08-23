@@ -1,3 +1,7 @@
+<!--
+  EDIT PRODUCT — passes the loaded product into the shared form so every
+  field starts pre-filled.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import ProductForm from '$lib/components/admin/product-form.svelte';

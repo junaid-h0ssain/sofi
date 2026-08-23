@@ -1,3 +1,8 @@
+/**
+ * EDIT PRODUCT — same as new, plus:
+ *  - load fetches the existing row by the [id] route param (404 if missing)
+ *  - the action runs UPDATE instead of INSERT
+ */
 import { eq } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';

@@ -1,6 +1,12 @@
+<!--
+  PRODUCT DETAIL PAGE — image, price, add-to-cart form, specs table and
+  "more in this category" suggestions.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
+	// `toast` works anywhere: it just queues a notification for the <Toaster>
+	// mounted once in the root layout.
 	import { toast } from 'svelte-sonner';
 	import ProductCard from '$lib/components/product/product-card.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -8,12 +14,7 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
-	import {
-		Table,
-		TableBody,
-		TableCell,
-		TableRow
-	} from '$lib/components/ui/table/index.js';
+	import { Table, TableBody, TableCell, TableRow } from '$lib/components/ui/table/index.js';
 	import ShoppingCartIcon from '@lucide/svelte/icons/shopping-cart';
 	import { formatMoney } from '$lib/utils/money';
 	import type { PageData } from './$types';
@@ -30,6 +31,7 @@
 <svelte:head><title>{product.name} · sofi</title></svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+	<!-- Breadcrumb trail: Home / Products / Category / Name -->
 	<nav class="text-muted-foreground mb-6 flex items-center gap-2 text-sm" aria-label="Breadcrumb">
 		<a href={resolve('/')} class="hover:text-foreground">Home</a>
 		<span>/</span>
@@ -59,6 +61,7 @@
 
 			<h1 class="text-3xl font-bold tracking-tight">{product.name}</h1>
 
+			<!-- cents → "$1,099.00" only at display time -->
 			<p class="text-3xl font-semibold">{formatMoney(product.priceCents)}</p>
 
 			<p class="text-muted-foreground leading-relaxed">{product.description}</p>
@@ -76,6 +79,15 @@
 					{/if}
 				</p>
 
+				<!--
+				  Add-to-cart form → named action `?/addToCart`.
+				  The enhance callback inspects the action RESULT (not the reactive
+				  `form` prop — that isn't updated yet inside the callback):
+				    result.type 'success' → green toast
+				    result.type 'failure' → red toast with the server's message
+				  update() then applies defaults & refreshes layout data, which is
+				  what makes the cart badge count go up.
+				-->
 				<form
 					method="POST"
 					action="?/addToCart"
@@ -113,6 +125,10 @@
 		</div>
 	</div>
 
+	<!--
+	  Specs are a flexible JSONB object, so we render whatever keys exist.
+	  Object.keys length check hides the whole section for spec-less products.
+	-->
 	{#if Object.keys(product.specs).length > 0}
 		<section class="mt-14">
 			<h2 class="mb-4 text-xl font-semibold tracking-tight">Specifications</h2>

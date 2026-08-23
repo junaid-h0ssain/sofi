@@ -1,3 +1,11 @@
+/**
+ * ADMIN PRODUCTS LIST — table of everything + delete action.
+ *
+ * The delete action shows a classic SQL constraint lesson:
+ * order_item references products with ON DELETE RESTRICT, so deleting a
+ * product that appears in an old order makes Postgres reject the DELETE.
+ * We catch that and explain it to the admin instead of crashing.
+ */
 import { desc, eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';

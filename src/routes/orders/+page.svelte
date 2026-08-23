@@ -1,3 +1,6 @@
+<!--
+  ORDERS LIST — compact cards linking to each order's detail page.
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -10,6 +13,7 @@
 
 	type OrderStatus = 'paid' | 'shipped' | 'delivered' | 'cancelled';
 
+	/** Map an order status to a badge color. */
 	function statusVariant(status: OrderStatus) {
 		switch (status) {
 			case 'paid':

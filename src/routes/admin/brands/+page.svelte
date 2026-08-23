@@ -1,3 +1,8 @@
+<!--
+  ADMIN BRANDS — inline "add" form at the top, one card per brand below.
+  Brands still referenced by products show an "in use" badge instead of a
+  delete button.
+-->
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { toast } from 'svelte-sonner';
@@ -6,13 +11,15 @@
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
-	import type { PageData, ActionData } from './$types';
+	import type { PageData } from './$types';
 
-	let { data, form }: { data: PageData; form: ActionData } = $props();
+	let { data }: { data: PageData } = $props();
 
 	let newBrandError: string | undefined = $state();
 	let deleteError: string | undefined = $state();
 
+	// Shared result handling for the create form.
+	// `reset` clears the inputs only after the server accepted the row.
 	function handleCreate(result: { type: string; data?: Record<string, unknown> }, reset: () => void) {
 		if (result.type === 'failure') {
 			newBrandError = String(result.data?.message ?? 'Failed');

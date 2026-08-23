@@ -1,3 +1,8 @@
+<!--
+  ORDER CONFIRMATION / DETAIL PAGE.
+  Doubles as the "thank you" screen right after mock checkout and the
+  reference page reachable later from "My orders".
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -12,10 +17,6 @@
 
 	type OrderStatus = 'paid' | 'shipped' | 'delivered' | 'cancelled';
 
-	const itemsTotalCents = $derived(
-		data.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
-	);
-
 	function statusVariant(status: OrderStatus) {
 		switch (status) {
 			case 'paid':
@@ -28,12 +29,18 @@
 				return 'destructive';
 		}
 	}
+
+	// Items subtotal straight from the stored line items.
+	const itemsTotalCents = $derived(
+		data.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0)
+	);
 </script>
 
 <svelte:head><title>Order {data.order.id.slice(0, 8)} · sofi</title></svelte:head>
 
 <div class="mx-auto max-w-3xl px-4 py-8 sm:px-6">
 	{#if data.order.status !== 'cancelled'}
+		<!-- Big friendly confirmation header -->
 		<div class="mb-6 flex items-center gap-3">
 			<CheckCircleIcon class="size-8 text-green-600" />
 			<div>
@@ -78,6 +85,7 @@
 		<Separator class="my-5" />
 
 		<div class="grid gap-6 sm:grid-cols-2">
+			<!-- <address> is semantic HTML for contact information -->
 			<div>
 				<p class="text-muted-foreground mb-1 text-xs uppercase">Shipping to</p>
 				<address class="text-sm not-italic">

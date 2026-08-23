@@ -1,3 +1,14 @@
+<!--
+  ============================================================================
+  CATALOG PAGE (/products) — client side
+  ============================================================================
+  Layout: a filter sidebar on the left, the product grid on the right.
+
+  Three separate <form method="get"> elements cooperate by carrying each
+  other's active filters in hidden inputs:
+    1. the sort dropdown (auto-submits when changed)
+    2. the sidebar form (search + category + brand + price)
+-->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import ProductCard from '$lib/components/product/product-card.svelte';
@@ -9,14 +20,18 @@
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	// From $lib/types (NOT $lib/server!) — safe to use in browser code.
 	import { SORT_OPTIONS } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
+	// UI-only state: whether the filter panel is open on small screens,
+	// and a reference to the sort <form> so we can submit it programmatically.
 	let mobileFiltersOpen = $state(false);
 	let sortForm: HTMLFormElement | undefined = $state();
 
+	// $derived recalculates automatically whenever `data` changes after navigation.
 	const sortValue = $derived(data.filters.sort ?? 'newest');
 	const hasActiveFilters = $derived(
 		Boolean(
@@ -28,6 +43,10 @@
 		)
 	);
 
+	/**
+	 * Build the URL for a pagination link while PRESERVING every active filter.
+	 * This is why filters live in the URL — pages stay linkable.
+	 */
 	function buildPageUrl(page: number): string {
 		const params = new URLSearchParams();
 		if (data.filters.q) params.set('q', data.filters.q);
@@ -41,6 +60,10 @@
 		return query ? `${resolve('/products')}?${query}` : resolve('/products');
 	}
 
+	/**
+	 * Turn [1,2,3,…,n] into a compact page list with ellipses:
+	 * 1 … 4 5 6 … 12
+	 */
 	function pageNumbers(current: number, total: number): (number | 'ellipsis')[] {
 		if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 		const pages: (number | 'ellipsis')[] = [1];
@@ -51,7 +74,12 @@
 		return pages;
 	}
 
-	// `change` bubbles from the checkboxes, so one handler per group is enough.
+	/**
+	 * Auto-submit for checkbox groups (category & brand).
+	 * The native `change` event bubbles up from the checkboxes to the
+	 * <fieldset>, so ONE handler covers the whole group. requestSubmit()
+	 * sends the GET form exactly as if Apply had been clicked.
+	 */
 	function autoSubmit(event: Event) {
 		const currentTarget = event.currentTarget as HTMLFieldSetElement | null;
 		currentTarget?.closest('form')?.requestSubmit();
@@ -61,6 +89,7 @@
 <svelte:head><title>Products · sofi</title></svelte:head>
 
 <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+	<!-- ===== Header row: title + sort control ============================ -->
 	<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">
@@ -69,9 +98,17 @@
 			<p class="text-muted-foreground text-sm">{data.result.total} products found</p>
 		</div>
 		<div class="flex items-center gap-2">
+			<!-- On mobile the sidebar is hidden; this button toggles it -->
 			<Button variant="outline" size="sm" class="lg:hidden" onclick={() => (mobileFiltersOpen = !mobileFiltersOpen)}>
 				<SlidersHorizontalIcon class="mr-1 size-4" /> Filters
 			</Button>
+
+			<!--
+			  Sort dropdown. It lives in its own tiny GET form that carries all
+			  currently-active filters as hidden inputs, so changing the sort
+			  doesn't lose your selection. `class="contents"` makes the form
+			  invisible in the layout while keeping its inputs functional.
+			-->
 			<form method="get" action={resolve('/products')} class="contents" bind:this={sortForm}>
 				{#each data.filters.brands as b (b)}
 					<input type="hidden" name="brand" value={b} />
@@ -87,7 +124,7 @@
 					name="sort"
 					value={sortValue}
 					onValueChange={(v) => {
-						if (v && sortForm) sortForm.requestSubmit();
+						if (v && sortForm) sortForm.requestSubmit(); // apply immediately on change
 					}}
 				>
 					<Select.Trigger class="w-[180px]" aria-label="Sort products">Sort</Select.Trigger>
@@ -102,10 +139,11 @@
 	</div>
 
 	<div class="flex gap-8">
-		<!-- Filters sidebar -->
-		<aside class="{mobileFiltersOpen ? 'block' : 'hidden'} lg:block w-full shrink-0 space-y-6 lg:w-60">
-			<Card.Root class="p-5 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+		<!-- ===== Filter sidebar ============================================== -->
+		<aside class="{mobileFiltersOpen ? 'block' : 'hidden'} w-full space-y-6 lg:block lg:w-60 lg:shrink-0">
+			<Card.Root class="p-5">
 				<form method="get" action={resolve('/products')} class="space-y-6">
+					<!-- keep the chosen sort when this form is submitted -->
 					<input type="hidden" name="sort" value={sortValue} />
 
 					<div class="space-y-2">
@@ -115,6 +153,7 @@
 
 					<Separator />
 
+					<!-- Category checkboxes auto-submit via bubbling change event -->
 					<fieldset class="space-y-2" onchange={autoSubmit}>
 						<legend class="text-sm font-medium">Category</legend>
 						{#each data.categories as cat (cat.id)}
@@ -150,6 +189,7 @@
 
 					<Separator />
 
+					<!-- Price needs manual Apply: submitting while typing would be jarring -->
 					<fieldset class="space-y-2">
 						<legend class="text-sm font-medium">Price ($)</legend>
 						<div class="flex items-center gap-2">
@@ -160,7 +200,7 @@
 					</fieldset>
 
 					<div class="flex gap-2">
-						<Button type="submit" class="flex-1">Apply</Button>
+						<Button type="submit" class="flex-1">Apply search &amp; price</Button>
 						{#if hasActiveFilters}
 							<Button type="button" variant="outline" href={resolve('/products')}>Reset</Button>
 						{/if}
@@ -169,7 +209,7 @@
 			</Card.Root>
 		</aside>
 
-		<!-- Results -->
+		<!-- ===== Results grid ================================================ -->
 		<div class="min-w-0 flex-1">
 			{#if data.result.products.length === 0}
 				<Card.Root class="p-12 text-center">
@@ -186,9 +226,7 @@
 
 				{#if data.result.pages > 1}
 					<nav class="mt-8 flex items-center justify-center gap-1" aria-label="Pagination">
-						<Button variant="outline" size="icon" disabled={data.result.page <= 1} href={buildPageUrl(data.result.page - 1)} aria-label="Previous page">
-							‹
-						</Button>
+						<Button variant="outline" size="icon" disabled={data.result.page <= 1} href={buildPageUrl(data.result.page - 1)} aria-label="Previous page">‹</Button>
 						{#each pageNumbers(data.result.page, data.result.pages) as p (String(p))}
 							{#if p === 'ellipsis'}
 								<span class="text-muted-foreground px-2">…</span>
@@ -198,9 +236,7 @@
 								<Button variant="outline" size="icon" href={buildPageUrl(p)}>{p}</Button>
 							{/if}
 						{/each}
-						<Button variant="outline" size="icon" disabled={data.result.page >= data.result.pages} href={buildPageUrl(data.result.page + 1)} aria-label="Next page">
-							›
-						</Button>
+						<Button variant="outline" size="icon" disabled={data.result.page >= data.result.pages} href={buildPageUrl(data.result.page + 1)} aria-label="Next page">›</Button>
 					</nav>
 				{/if}
 			{/if}

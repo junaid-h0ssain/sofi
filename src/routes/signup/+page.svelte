@@ -1,3 +1,7 @@
+<!--
+  SIGNUP PAGE — same pattern as login:
+  plain HTML form → named action `?/signup` → server returns errors via `form`.
+-->
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';

@@ -1,3 +1,7 @@
+/**
+ * ADMIN CATEGORIES — same CRUD pattern as brands (see that file for details).
+ * Category slugs also drive which placeholder image is shown.
+ */
 import { asc, count, eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
