@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const q = params.get('q')?.trim() || undefined;
 	const brands = params.getAll('brand').filter(Boolean);
-	const category = params.get('category') || undefined;
+	const categories = params.getAll('category').filter(Boolean);
 	const sortParam = params.get('sort') ?? 'newest';
 	const sort: SortOption = (
 		VALID_SORTS.has(sortParam) ? sortParam : 'newest'
@@ -18,13 +18,18 @@ export const load: PageServerLoad = async ({ url }) => {
 	const maxPriceCents = parsePrice(params.get('max'));
 	const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1);
 
-	const [result, allBrands, categories] = await Promise.all([
-		listProducts({ q, brands, category, sort, minPriceCents, maxPriceCents, page }),
+	const [result, allBrands, allCategories] = await Promise.all([
+		listProducts({ q, brands, categories, sort, minPriceCents, maxPriceCents, page }),
 		getBrands(),
 		getCategoriesWithCounts()
 	]);
 
-	return { result, filters: { q, brands, category, sort, min: params.get('min'), max: params.get('max') }, allBrands, categories };
+	return {
+		result,
+		filters: { q, brands, categories, sort, min: params.get('min'), max: params.get('max') },
+		allBrands,
+		categories: allCategories
+	};
 };
 
 function parsePrice(value: string | null): number | undefined {

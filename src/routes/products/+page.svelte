@@ -21,7 +21,7 @@
 	const hasActiveFilters = $derived(
 		Boolean(
 			data.filters.q ||
-				data.filters.category ||
+				data.filters.categories.length > 0 ||
 				data.filters.brands.length > 0 ||
 				data.filters.min ||
 				data.filters.max
@@ -32,7 +32,7 @@
 		const params = new URLSearchParams();
 		if (data.filters.q) params.set('q', data.filters.q);
 		for (const brand of data.filters.brands) params.append('brand', brand);
-		if (data.filters.category) params.set('category', data.filters.category);
+		for (const cat of data.filters.categories) params.append('category', cat);
 		if (data.filters.sort && data.filters.sort !== 'newest') params.set('sort', data.filters.sort);
 		if (data.filters.min) params.set('min', data.filters.min);
 		if (data.filters.max) params.set('max', data.filters.max);
@@ -49,6 +49,12 @@
 		if (current < total - 2) pages.push('ellipsis');
 		pages.push(total);
 		return pages;
+	}
+
+	// `change` bubbles from the checkboxes, so one handler per group is enough.
+	function autoSubmit(event: Event) {
+		const currentTarget = event.currentTarget as HTMLFieldSetElement | null;
+		currentTarget?.closest('form')?.requestSubmit();
 	}
 </script>
 
@@ -70,7 +76,9 @@
 				{#each data.filters.brands as b (b)}
 					<input type="hidden" name="brand" value={b} />
 				{/each}
-				{#if data.filters.category}<input type="hidden" name="category" value={data.filters.category} />{/if}
+				{#each data.filters.categories as c (c)}
+					<input type="hidden" name="category" value={c} />
+				{/each}
 				{#if data.filters.q}<input type="hidden" name="q" value={data.filters.q} />{/if}
 				{#if data.filters.min}<input type="hidden" name="min" value={data.filters.min} />{/if}
 				{#if data.filters.max}<input type="hidden" name="max" value={data.filters.max} />{/if}
@@ -107,7 +115,7 @@
 
 					<Separator />
 
-					<fieldset class="space-y-2">
+					<fieldset class="space-y-2" onchange={autoSubmit}>
 						<legend class="text-sm font-medium">Category</legend>
 						{#each data.categories as cat (cat.id)}
 							<label class="flex cursor-pointer items-center gap-2 text-sm" for="cat-{cat.slug}">
@@ -115,7 +123,7 @@
 									id="cat-{cat.slug}"
 									name="category"
 									value={cat.slug}
-									checked={data.filters.category === cat.slug}
+									checked={data.filters.categories.includes(cat.slug)}
 								/>
 								<span>{cat.name}</span>
 								<span class="text-muted-foreground ml-auto text-xs">{cat.productCount}</span>
@@ -125,7 +133,7 @@
 
 					<Separator />
 
-					<fieldset class="max-h-64 space-y-2 overflow-y-auto pr-1">
+					<fieldset class="max-h-64 space-y-2 overflow-y-auto pr-1" onchange={autoSubmit}>
 						<legend class="text-sm font-medium">Brand</legend>
 						{#each data.allBrands as brand (brand.id)}
 							<label class="flex cursor-pointer items-center gap-2 text-sm" for="brand-{brand.slug}">

@@ -10,7 +10,7 @@ export const PER_PAGE = 12;
 export interface CatalogFilters {
 	q?: string;
 	brands?: string[];
-	category?: string;
+	categories?: string[];
 	sort?: SortOption;
 	minPriceCents?: number;
 	maxPriceCents?: number;
@@ -28,8 +28,8 @@ function buildWhere(filters: CatalogFilters): SQL | undefined {
 	if (filters.brands?.length) {
 		conditions.push(inArray(brand.slug, filters.brands));
 	}
-	if (filters.category) {
-		conditions.push(eq(category.slug, filters.category));
+	if (filters.categories?.length) {
+		conditions.push(inArray(category.slug, filters.categories));
 	}
 	if (filters.minPriceCents !== undefined) {
 		conditions.push(gte(product.priceCents, filters.minPriceCents));

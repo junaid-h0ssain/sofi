@@ -26,6 +26,7 @@
 		<Card.Root class="p-6">
 			<form
 				method="POST"
+				action="?/placeOrder"
 				use:enhance={() => {
 					submitting = true;
 					return async ({ result, update }) => {
