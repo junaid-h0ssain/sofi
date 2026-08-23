@@ -18,6 +18,7 @@
 import { betterAuth } from 'better-auth/minimal';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin } from 'better-auth/plugins/admin';
+import { bearer } from 'better-auth/plugins/bearer';
 import { db } from './db';
 
 // The WEB app's public URL. better-auth uses it for OAuth callback URLs and
@@ -41,6 +42,10 @@ export const auth = betterAuth({
 	plugins: [
 		// Adds the `role` column on users + admin APIs. The .NET API trusts the
 		// role value it reads from the shared `user` table.
-		admin()
+		admin(),
+		// Lets non-cookie clients (the Flutter app) call get-session/sign-out
+		// with "Authorization: Bearer <session-token>". Sign-in/up already return
+		// the token in the JSON body; the .NET API reads the same session table.
+		bearer()
 	]
 });
