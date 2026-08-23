@@ -8,10 +8,12 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { APIError } from 'better-auth/api';
 import { auth } from '$lib/server/auth';
+import { env } from '$env/dynamic/private';
 
 export const load: PageServerLoad = async (event) => {
 	if (event.locals.user) redirect(302, '/');
-	return {};
+	// Only show the GitHub button if OAuth credentials are configured.
+	return { hasGithub: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) };
 };
 
 export const actions: Actions = {
@@ -45,5 +47,18 @@ export const actions: Actions = {
 
 		// Account created AND signed in (better-auth sets the session cookie).
 		redirect(302, '/');
+	},
+
+	/**
+	 * GitHub "sign-up" is really just social sign-in: better-auth creates the
+	 * account automatically on first login (and signs into an existing one).
+	 */
+	github: async () => {
+		const result = await auth.api.signInSocial({
+			body: { provider: 'github', callbackURL: '/' }
+		});
+		// Send the browser to GitHub's consent screen.
+		if (result.url) redirect(302, result.url);
+		return fail(400, { message: 'GitHub sign-up failed' });
 	}
 };
