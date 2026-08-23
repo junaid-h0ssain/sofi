@@ -40,7 +40,7 @@
 			brandId: string;
 			categoryId: string;
 			imageUrl: string | null;
-			featured: number;
+			featured: boolean;
 			specs: Record<string, string>;
 		};
 		error?: string;
@@ -64,7 +64,7 @@
 	// svelte-ignore state_referenced_locally
 	let categoryId = $state(product?.categoryId ?? '');
 	// svelte-ignore state_referenced_locally
-	let featuredChecked = $state(product?.featured === 1);
+	let featuredChecked = $state(product?.featured ?? false);
 
 	// JSONB object → "Key: Value" lines for the textarea.
 	// svelte-ignore state_referenced_locally
