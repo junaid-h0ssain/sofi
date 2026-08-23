@@ -53,42 +53,48 @@ class ProductCard extends StatelessWidget {
                       child: Chip(
                         label: const Text('Sold out'),
                         visualDensity: VisualDensity.compact,
-                        backgroundColor:
-                            theme.colorScheme.errorContainer,
+                        backgroundColor: theme.colorScheme.errorContainer,
                         labelStyle: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onErrorContainer),
+                          fontSize: 11,
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.brand.name.toUpperCase(),
-                    style: theme.textTheme.labelSmall?.copyWith(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.brand.name.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.outline,
-                        letterSpacing: 0.5),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.name,
-                    style: theme.textTheme.titleSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  const SizedBox(height: 8),
-                  Text(formatCents(product.priceCents),
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                ],
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      product.name,
+                      style: theme.textTheme.titleSmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    const SizedBox(height: 8),
+                    Text(
+                      formatCents(product.priceCents),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
