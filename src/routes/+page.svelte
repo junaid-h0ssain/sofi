@@ -18,7 +18,7 @@
 <svelte:head><title>sofi — electronics store</title></svelte:head>
 
 <!-- Hero -->
-<section class="from-primary/5 via-background to-background border-b bg-gradient-to-b">
+<section class="from-primary/5 via-background to-background border-b bg-linear-to-b">
 	<div class="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-20 text-center sm:px-6">
 		<Badge variant="outline" class="px-3 py-1">Free shipping on orders over $50</Badge>
 		<h1 class="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">

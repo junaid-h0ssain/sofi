@@ -4,8 +4,9 @@
  * ============================================================================
  *
  * HTML forms submit everything as strings, so we need one place that turns
- * raw FormData into validated, typed values. Sharing it between the create
- * and update actions means both behave identically.
+ * raw FormData into a validated payload matching the .NET API's
+ * SaveProductRequest contract (price in DOLLARS on the wire; the API
+ * converts to cents before storing).
  */
 import { slugify } from '$lib/utils/slug';
 
@@ -13,12 +14,12 @@ export interface ParsedProduct {
 	name: string;
 	slug: string;
 	description: string;
-	priceCents: number;
+	price: number; // dollars — the API stores ×100 as cents
 	stock: number;
 	brandId: string;
 	categoryId: string;
-	imageUrl: string | null;
-	featured: number;
+	imageUrl?: string | null;
+	featured: boolean;
 	specs: Record<string, string>;
 }
 
@@ -30,23 +31,22 @@ export interface ParsedProduct {
 export function parseProductForm(formData: FormData):
 	| { ok: true; data: ParsedProduct }
 	| { ok: false; message: string } {
-	// FormData.get returns FormDataValue | null → String(...) + ?? '' normalizes.
 	const name = String(formData.get('name') ?? '').trim();
 	const description = String(formData.get('description') ?? '').trim();
 	const priceDollars = Number.parseFloat(String(formData.get('price') ?? ''));
 	const stock = Number.parseInt(String(formData.get('stock') ?? ''), 10);
 	const brandId = String(formData.get('brandId') ?? '');
 	const categoryId = String(formData.get('categoryId') ?? '');
-	const imageUrl = String(formData.get('imageUrl') ?? '').trim() || null;
-	// Unchecked checkboxes simply don't appear in the submission at all.
-	const featured = formData.get('featured') ? 1 : 0;
+	const rawImageUrl = String(formData.get('imageUrl') ?? '').trim();
+	const featured = formData.get('featured') !== null; // unchecked boxes don't submit at all
 	const specsRaw = String(formData.get('specs') ?? '');
 
 	// --- validation: return the FIRST problem as a friendly message ---
 	if (!name) return { ok: false, message: 'Name is required' };
 	if (!Number.isFinite(priceDollars) || priceDollars < 0)
 		return { ok: false, message: 'A valid price is required' };
-	if (!Number.isInteger(stock) || stock < 0) return { ok: false, message: 'Stock must be a non-negative integer' };
+	if (!Number.isInteger(stock) || stock < 0)
+		return { ok: false, message: 'Stock must be a non-negative integer' };
 	if (!brandId) return { ok: false, message: 'Brand is required' };
 	if (!categoryId) return { ok: false, message: 'Category is required' };
 
@@ -54,7 +54,6 @@ export function parseProductForm(formData: FormData):
 	 * Specs come from a textarea, one "Key: Value" per line:
 	 *   RAM: 16 GB
 	 *   Screen: 14-inch
-	 * We split on lines, then on the FIRST colon (values may contain colons).
 	 */
 	const specs: Record<string, string> = {};
 	for (const line of specsRaw.split('\n')) {
@@ -73,18 +72,18 @@ export function parseProductForm(formData: FormData):
 			name,
 			slug: slugify(name), // slug always derives from the name
 			description,
-			priceCents: Math.round(priceDollars * 100), // dollars → whole cents
+			price: priceDollars,
 			stock,
 			brandId,
 			categoryId,
-			imageUrl,
+			imageUrl: rawImageUrl || null,
 			featured,
 			specs
 		}
 	};
 }
 
-/** Inverse of the parser: JSONB specs → textarea text for the edit form. */
+/** JSONB object → "Key: Value" lines for the edit form's textarea. */
 export function specsToText(specs: Record<string, string>): string {
 	return Object.entries(specs)
 		.map(([key, value]) => `${key}: ${value}`)

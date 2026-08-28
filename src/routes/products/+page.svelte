@@ -211,7 +211,7 @@
 
 		<!-- ===== Results grid ================================================ -->
 		<div class="min-w-0 flex-1">
-			{#if data.result.products.length === 0}
+			{#if data.result.items.length === 0}
 				<Card.Root class="p-12 text-center">
 					<p class="font-medium">No products found</p>
 					<p class="text-muted-foreground mt-1 text-sm">Try adjusting your filters or search terms.</p>
@@ -219,7 +219,7 @@
 				</Card.Root>
 			{:else}
 				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-					{#each data.result.products as product (product.id)}
+					{#each data.result.items as product (product.id)}
 						<ProductCard {product} />
 					{/each}
 				</div>

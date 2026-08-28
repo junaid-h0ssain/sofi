@@ -52,7 +52,7 @@
 					<TableRow>
 						<TableCell class="font-medium">
 							{p.name}
-							{#if p.featured === 1}
+							{#if p.featured}
 								<Badge variant="secondary" class="ml-1">Featured</Badge>
 							{/if}
 						</TableCell>

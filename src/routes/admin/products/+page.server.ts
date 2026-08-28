@@ -1,48 +1,34 @@
 /**
- * ADMIN PRODUCTS LIST — table of everything + delete action.
- *
- * The delete action shows a classic SQL constraint lesson:
- * order_item references products with ON DELETE RESTRICT, so deleting a
- * product that appears in an old order makes Postgres reject the DELETE.
- * We catch that and explain it to the admin instead of crashing.
+ * ADMIN PRODUCTS LIST — table data + delete action, proxied to the API.
  */
-import { desc, eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { db } from '$lib/server/db';
-import { brand, category, product } from '$lib/server/db/schema';
+import { requireAdmin } from '$lib/server/guard';
+import { ApiClientError, adminApi } from '$lib/server/api';
 
-export const load: PageServerLoad = async () => {
-	const rows = await db
-		.select({
-			id: product.id,
-			name: product.name,
-			priceCents: product.priceCents,
-			stock: product.stock,
-			featured: product.featured,
-			brandName: brand.name,
-			categoryName: category.name
-		})
-		.from(product)
-		.innerJoin(brand, eq(product.brandId, brand.id))
-		.innerJoin(category, eq(product.categoryId, category.id))
-		.orderBy(desc(product.createdAt));
+export const load: PageServerLoad = async (event) => {
+	requireAdmin(event.locals);
+	const products = await adminApi.products.list(event.locals.sessionToken!);
 
-	return { products: rows };
+	return { products };
 };
 
 export const actions: Actions = {
-	delete: async ({ request }) => {
-		const formData = await request.formData();
+	delete: async (event) => {
+		const user = requireAdmin(event.locals);
+		const token = event.locals.sessionToken!;
+
+		const formData = await event.request.formData();
 		const id = String(formData.get('id') ?? '');
 		if (!id) return fail(400, { message: 'Missing product id' });
 
 		try {
-			await db.delete(product).where(eq(product.id, id));
-		} catch {
-			return fail(400, {
-				message: 'Cannot delete: this product is referenced by existing orders.'
-			});
+			await adminApi.products.delete(token, id);
+		} catch (err) {
+			// FK RESTRICT on the API side → 409 with an explanatory message.
+			const message =
+				err instanceof ApiClientError ? err.message : 'Delete failed';
+			return fail(400, { message });
 		}
 
 		return { deleted: true };

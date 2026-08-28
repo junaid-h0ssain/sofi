@@ -1,0 +1,20 @@
+{
+	"name": "sofi-auth",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun run --hot src/index.ts",
+		"start": "bun src/index.ts",
+		"generate": "better-auth generate --config src/auth.ts --output src/db/schema.ts --yes"
+	},
+	"dependencies": {
+		"@neondatabase/serverless": "^1.1.0",
+		"better-auth": "^1.6.23",
+		"drizzle-orm": "^0.45.2",
+		"hono": "^4.9.0"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.2.0"
+	}
+}

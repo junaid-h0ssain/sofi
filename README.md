@@ -1,195 +1,187 @@
-# sofi — an educational e-commerce store
+# sofi — an educational e-commerce platform (split backend)
 
-A full-stack **electronics store** built to teach modern full-stack development:
-browse a catalog, filter by brand/category/price, manage a cart, check out
-(mock payment), and administer products through an admin panel — with
-authentication, role-based access and database-level Row Level Security.
+A full-stack **electronics store** built to teach modern, service-oriented
+development. The monolithic SvelteKit app was migrated into **three
+cooperating services** sharing one Neon PostgreSQL database — the exact shape
+you'd deploy when a mobile app is next on the roadmap.
 
 Everything is heavily commented so you can read the code top-to-bottom and
 learn how each piece works.
 
+## Architecture
+
+```
+                    ┌─────────────────────────────┐
+  Browser ────────▶ │  web/ SvelteKit (SSR + BFF) │ :5173
+                    │  · renders pages            │
+                    │  · proxies /api/auth/* ────────────▶ auth/ (Hono + Bun) :4000
+                    │  · loads/actions call API ─────────┘  better-auth
+                    │    with Bearer <session>     │
+                    └─────────────────────────────┘         │
+                                                            ▼
+  Future mobile ──▶  backend/ SoFi.Api (.NET 10) :5080 ──▶ Neon Postgres
+                    EF Core · REST /api/v1        (shared by ALL services)
+```
+
+| Service | Stack | Owns |
+| --- | --- | --- |
+| `auth/` | Hono + Bun + better-auth | `user`, `session`, `account`, `verification` tables; sign-up/in/out, GitHub OAuth |
+| `backend/src/SoFi.Api` | ASP.NET Core (.NET 10) + EF Core | `brand`, `category`, `product`, `cart_item`, `order`, `order_item`; all business logic via REST `/api/v1` |
+| root (`src/`) | SvelteKit + Svelte 5 + shadcn-svelte | SSR pages; acts as **BFF** (server-side proxy) so the browser only ever talks to one origin |
+
+### How authentication works across services
+
+1. Sign-in posts to better-auth (through the web proxy), which creates a row
+   in the shared `session` table and sets a cookie on the web origin.
+2. On every request, `hooks.server.ts` validates that cookie against the auth
+   service and keeps the **plain session token** in `event.locals`.
+3. Server-side page code calls the .NET API with
+   `Authorization: Bearer <token>`; a custom ASP.NET handler
+   (`Auth/BetterAuthHandler.cs`) verifies the token against the same session
+   table and builds the standard claims principal — so plain
+   `[Authorize(Roles = "admin")]` just works.
+4. **Mobile app later?** Enable better-auth's bearer plugin in `auth/` and send
+   the same header from the app — zero API changes needed.
+
 ## Tech stack
 
-| Layer          | Technology                                                        |
-| -------------- | ----------------------------------------------------------------- |
-| Framework      | [SvelteKit](https://svelte.dev/docs/kit) + Svelte 5 (runes)       |
-| Styling / UI   | Tailwind CSS 4 + [shadcn-svelte](https://shadcn-svelte.com)        |
-| Database       | PostgreSQL on [Neon](https://neon.tech) (serverless HTTP driver)   |
-| ORM            | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit              |
-| Auth           | [better-auth](https://better-auth.com) (email/password + GitHub, admin plugin) |
+| Layer | Technology |
+| --- | --- |
+| Web frontend | [SvelteKit](https://svelte.dev/docs/kit) + Svelte 5 runes, Tailwind CSS 4, [shadcn-svelte](https://shadcn-svelte.com) |
+| Backend API | [.NET 10](https://dotnet.microsoft.com) Web API, controllers, Swagger |
+| ORM | [EF Core 10](https://learn.microsoft.com/ef/core/) + Npgsql (snake_case naming, jsonb specs, real transactions) |
+| Auth | [better-auth](https://better-auth.com) as a standalone [Hono](https://hono.dev) service on Bun |
+| Database | PostgreSQL on [Neon](https://neon.tech) (serverless, remote — see compose note) |
 
 ## Features
 
-- **Catalog** — product listing with URL-based filters (`?q=&brand=&category=&sort=&min=&max=&page=`),
-  so filtered views are shareable links that work without JavaScript
-- **Product pages** — flexible JSONB specs table, stock badges, related items
-- **Cart** — database-backed per-user cart with live badge count in the header
-- **Mock checkout** — address form + simulated payment; the whole order is
-  written in **one atomic `db.batch()`** (order + items + stock decrement + cart clear)
-- **Orders** — history list and detail page with purchase-time price snapshots
-- **Auth** — sign up / sign in / GitHub OAuth; sessions handled by better-auth
-- **Admin panel** (`/admin`) — dashboard stats + CRUD for products, brands,
-  categories, protected by the user's `role`
-- **Row Level Security** — catalog tables are world-readable via policies;
-  cart/order tables deny every non-owner connection outright
+- Catalog with URL-based filters (`?q=&brand=&category=&sort=&min=&max=&page=`)
+- Product pages with JSONB spec tables, stock badges, related items
+- Database-backed cart with live header badge
+- Mock checkout executed in ONE database transaction (order + items +
+  stock decrement + cart clear)
+- Order history & confirmation with purchase-time price snapshots
+- Email/password + GitHub OAuth sign-in/sign-up
+- Role-guarded admin panel: dashboard stats, product/brand/category CRUD
+- Row Level Security on every domain table
 
 ## Getting started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) (v1.2+)
-- A free [Neon](https://neon.tech) PostgreSQL database (or any Postgres — see note below)
+- [Bun](https://bun.sh) v1.2+ (web + auth)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) (API)
+- A free [Neon](https://neon.tech) database (or any Postgres)
 
-### Setup
-
-```sh
-bun install
-
-# configure environment variables
-cp .env.example .env
-```
-
-Fill in `.env`:
-
-```ini
-DATABASE_URL="postgres://…"        # your Neon connection string
-BETTER_AUTH_SECRET="any-long-random-string"
-ORIGIN="http://localhost:5173"     # app URL (used by better-auth)
-GITHUB_CLIENT_ID=""                # optional — enables GitHub login button
-GITHUB_CLIENT_SECRET=""
-```
-
-Create the tables and load demo data:
+### Configure
 
 ```sh
-bun run db:push    # create/update tables from src/lib/server/db/schema.ts (incl. RLS policies)
-bun run db:seed    # 8 brands, 8 categories, 34 products — idempotent, safe to re-run
+cp .env.example .env   # fill in DATABASE_URL, BETTER_AUTH_SECRET, optionally GitHub keys
 ```
 
-Start developing:
+The `.env` sits at the repo root and feeds **all three services**
+(Bun auto-loads it; Program.cs parses it for dotnet; compose interpolates it).
+
+### Run natively (three terminals)
 
 ```sh
-bun run dev
+# 1) auth service (also owns the auth tables' schema)
+cd auth && bun install && bun run src/index.ts          # :4000
+
+# 2) .NET API — auto-applies migrations + seeds demo data in Development
+cd backend/src/SoFi.Api && dotnet ef database update --context AppDbContext   # first time*
+dotnet run                                               # :5080
+
+# 3) web
+bun install && bun run dev                               # :5173
 ```
 
-> Using plain Postgres instead of Neon? Swap the driver in
-> `src/lib/server/db/index.ts` (e.g. `drizzle-orm/node-postgres`). Note the
-> checkout uses `db.batch()` because the neon-http driver has no transactions;
-> with a regular driver you could use `db.transaction()` instead.
+\* Requires the tool manifest: `cd backend && dotnet tool restore`.
+Order matters once: the auth service must create its tables before the API's
+first migration runs (its FKs reference the `user` table). After that,
+everything is idempotent. `dotnet run` also auto-migrates/seeds in Development.
+
+### Or run everything with Docker Compose
+
+```sh
+docker compose up
+```
+
+No postgres container — Neon is remote; compose wires all three services to
+`${DATABASE_URL}` and waits for auth health before starting the API.
+Web runs with hot reload via mounted sources.
 
 ### Create an admin account
 
-1. Sign up through the UI (`/signup`)
-2. Promote yourself:
-
 ```sh
-bun run db:admin your@email.com
+cd backend/src/SoFi.Api && dotnet run --no-build -- promote-admin your@email.com
 ```
 
-3. Reload the page — the "Admin panel" link appears in the user menu.
+Reload the site — "Admin panel" appears in the user menu.
 
-## Scripts
+## Useful commands
 
-| Command             | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| `bun run dev`       | Start the dev server                                      |
-| `bun run build`     | Production build                                          |
-| `bun run preview`   | Preview the production build                              |
-| `bun run check`     | Type-check everything (svelte-check)                      |
-| `bun run db:push`   | Push schema.ts changes to the database                    |
-| `bun run db:studio` | Browse/edit data in Drizzle Studio                        |
-| `bun run db:seed`   | Insert demo data (idempotent upserts)                     |
-| `bun run db:admin <email>` | Promote a user to `role = 'admin'`                 |
-| `bun run auth:schema` | Regenerate better-auth tables after changing auth config |
+| Where | Command | Purpose |
+| --- | --- | --- |
+| root | `bun run dev` / `build` / `check` | web dev server / production build / type-check |
+| root | `docker compose up` | run all three services |
+| `auth/` | `bun run generate` | regenerate better-auth schema after config changes |
+| `auth/` | `bunx drizzle-kit push` | apply auth-table schema changes |
+| `backend/` | `dotnet ef migrations add <Name> --project src/SoFi.Api --context AppDbContext` | evolve domain schema |
+| `backend/` | `dotnet ef database update --project src/SoFi.Api --context AppDbContext` | apply migrations |
+| `backend/src/SoFi.Api` | `dotnet run -- promote-admin <email>` | promote user to admin |
 
-## Project structure
+## API surface (`http://localhost:5080/api/v1`)
 
 ```
-src/
-├── hooks.server.ts            # runs on EVERY request: session → event.locals
-├── lib/
-│   ├── server/                # ⚠️ never ships to the browser (SvelteKit enforces this)
-│   │   ├── auth.ts            # better-auth configuration
-│   │   ├── guard.ts           # requireUser() / requireAdmin() redirects
-│   │   ├── catalog.ts         # all product/brand/category queries
-│   │   ├── cart.ts            # cart reads & writes (ownership-scoped)
-│   │   ├── product-form.ts    # shared form parsing/validation for admin
-│   │   └── db/
-│   │       ├── schema.ts      # all tables, relations & RLS policies ← start reading here!
-│   │       ├── index.ts       # database client
-│   │       └── seed.ts        # demo data seeder
-│   ├── components/
-│   │   ├── layout/            # header, footer
-│   │   ├── product/           # product card tile
-│   │   └── admin/             # shared admin form
-│   ├── components/ui/         # shadcn-svelte primitives (button, card, …)
-│   ├── utils/                 # money/pricing/slug/link helpers
-│   └── types.ts               # shared client+server TypeScript types
-└── routes/
-    ├── +layout.server.ts      # header data (user, categories, cart count)
-    ├── +page.svelte           # homepage: hero, categories, featured
-    ├── products/              # catalog + filters, [slug] detail + add-to-cart
-    ├── cart/                  # cart page + quantity/remove/clear actions
-    ├── checkout/              # mock checkout → atomic batch write
-    ├── orders/                # order history + [id] confirmation/detail
-    ├── login, signup, signout # authentication pages
-    └── admin/                 # guarded area: stats + product/brand/category CRUD
+GET  /products?q&brand*&category*&sort&min&max&page     → { items, total, page, pages }
+GET  /products/featured?limit=8      GET /products/{slug}    GET /products/{slug}/related
+GET  /brands                         GET /categories         (with product counts)
+
+Authorization: Bearer <better-auth-session-token>
+GET  /cart                           POST /cart/items        { productId, quantity }
+PUT  /cart/items/{itemId}            DELETE /cart/items/{itemId}
+DELETE /cart                         POST /checkout/orders   → 201 { orderId }
+GET  /orders                         GET /orders/{id}
+
+role=admin:
+GET  /admin/products/stats           GET|POST|PUT|DELETE /admin/products[/{id}]
+GET|POST /admin/brands               DELETE /admin/brands/{id}
+GET|POST /admin/categories           DELETE /admin/categories/{id}
 ```
 
-## How a request flows (the mental model)
+Swagger UI: `http://localhost:5080/swagger` (Development only).
 
-```
-browser ──GET /products?category=router──▶ hooks.server.ts
-                                            │ loads session → event.locals.user
-                                            ▼
-                               routes/products/+page.server.ts   (load)
-                                            │ calls $lib/server/catalog.ts
-                                            ▼
-                                        Neon Postgres
-                                            │ rows returned
-                                            ▼
-                               routes/products/+page.svelte      (render)
+## Learning path suggestion
 
-browser ──POST /cart?/setQuantity──▶ same route's actions.setQuantity()
-                                            │ validates + writes via Drizzle
-                                            ▼
-                          re-rendered page / redirect / action result
-```
+Read in this order:
 
-Key SvelteKit ideas used throughout:
-
-- **load functions** fetch data before rendering (`+page.server.ts`)
-- **form actions** are named POST handlers (`?/addToCart`) — real HTML forms
-  that work without JavaScript; `use:enhance` adds smooth client behavior
-- **URL is state** — filters/pagination live in query params
-- **layouts** share data across pages (header user/cart info)
-- **Svelte 5 runes** — `$props`, `$state`, `$derived`, snippets
+1. `src/lib/server/db/schema.ts` — *(moved)* now split: `auth/src/db/schema.ts`
+   + `backend/src/SoFi.Api/Domain/*.cs`
+2. `auth/src/auth.ts` → `auth/src/index.ts` — extracting better-auth into a service
+3. `src/routes/api/auth/[...path]/+server.ts` — writing an HTTP proxy correctly
+   (multiple Set-Cookie headers!)
+4. `src/hooks.server.ts` — cross-service session resolution
+5. `backend/src/SoFi.Api/Auth/BetterAuthHandler.cs` — custom ASP.NET authentication
+6. `backend/src/SoFi.Api/Data/AppDbContext.cs` — EF Core modelling (jsonb,
+   FKs to another service's table, ExcludeFromMigrations)
+7. `backend/src/SoFi.Api/Services/CheckoutService.cs` — atomic checkout
+8. `src/lib/server/api.ts` — typed BFF client
+9. `src/routes/admin/**` — role-guarded CRUD end to end
 
 ## Design decisions worth knowing
 
 | Decision | Why |
 | -------- | --- |
-| Prices as integer cents | Floating-point money causes rounding bugs; `$19.99` is stored as `1999` |
-| UUID text ids generated in JS | Needed so checkout can build ALL statements before executing one atomic batch |
-| Order copies name/price | Old orders stay historically correct after products change |
-| `db.batch()` not `db.transaction()` | neon-http driver has no interactive transactions; batch is atomic over one request |
-| Filters in URL params | Shareable/bookmarkable views; works without JS |
-| RLS on every table | Defense-in-depth if a lesser DB credential ever leaks |
-
-## Learning path suggestion
-
-Read the files in this order:
-
-1. `src/lib/server/db/schema.ts` — the data model
-2. `src/lib/server/db/index.ts` — connecting to Postgres
-3. `src/hooks.server.ts` + `src/lib/server/auth.ts` — sessions
-4. `src/lib/server/catalog.ts` — querying with Drizzle
-5. `src/routes/products/+page.server.ts` then its `.svelte` — load + render
-6. `src/routes/products/[slug]/+page.server.ts` — your first form action
-7. `src/routes/checkout/+page.server.ts` — atomic multi-table writes
-8. `src/routes/admin/…` — guards + full CRUD
+| Split into three services | One REST API serves web AND future mobile clients unchanged |
+| Session-token Bearer instead of JWT | All services share one DB; token lookup is simple and instantly revocable. JWT plugin can be added later without touching the API contract |
+| better-auth stays in Node | Reuses battle-tested auth logic + existing accounts; isolated behind a proxy so nothing else needs Node for auth |
+| EF Core owns domain schema (migrations) | Versioned schema evolution going forward; RLS re-applied inside the migration |
+| Prices as integer cents | No floating-point money bugs anywhere in the stack |
+| UUID text ids generated client-side | Lets checkout build every statement up-front; consistent across languages |
+| BFF pattern for the web | Browser sees a single origin: no CORS, cookies stay first-party |
 
 ---
 
-Built as a learning project — not production-ready (no real payments, rate
-limiting, or image uploads). Take it apart!
+Built as a learning project — not production-ready (mock payments, no rate
+limiting/uploads). Take it apart!

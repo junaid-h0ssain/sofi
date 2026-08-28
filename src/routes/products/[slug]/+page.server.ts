@@ -1,29 +1,29 @@
 /**
- * PRODUCT DETAIL PAGE (/products/[slug]) — server side.
+ * PRODUCT DETAIL PAGE (/products/[slug]) — server side (BFF).
  *
- * `[slug]` is a dynamic route segment: whatever sits there in the URL arrives
- * as `params.slug`. Unknown slug → error(404), which SvelteKit renders with
- * its built-in error page.
+ * The load calls the API; unknown slug → error(404) as before.
+ * The add-to-cart action forwards the user's session token so the API's
+ * [Authorize] endpoint can identify the shopper.
  */
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getProductBySlug, getRelatedProducts } from '$lib/server/catalog';
-import { addToCart } from '$lib/server/cart';
+import { ApiClientError, catalogApi, cartApi } from '$lib/server/api';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const product = await getProductBySlug(params.slug);
+	const product = await catalogApi.bySlug(params.slug);
 	if (!product) error(404, 'Product not found');
 
-	const related = await getRelatedProducts(product.categoryId, product.id, 4);
+	const related = await catalogApi.related(params.slug, 4);
 	return { product, related };
 };
 
 export const actions: Actions = {
 	/** "Add to cart" button on the detail page. */
 	addToCart: async (event) => {
-		// Adding to a cart obviously requires being logged in.
 		const user = event.locals.user;
 		if (!user) redirect(302, '/login');
+
+		const token = event.locals.sessionToken!; // present whenever a user is
 
 		const formData = await event.request.formData();
 		const productId = String(formData.get('productId') ?? '');
@@ -34,13 +34,15 @@ export const actions: Actions = {
 		}
 
 		try {
-			await addToCart(user.id, productId, quantity);
-		} catch {
-			return fail(400, { message: 'Could not add to cart' });
+			await cartApi.addItem(token, productId, quantity);
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : 'Could not add to cart';
+			return fail(400, { message });
 		}
 
-		// Returning success (not a redirect!) keeps the shopper on the page —
-		// the client shows a toast and the header cart badge refreshes.
+		// Success keeps the shopper on the page: a toast shows + the layout
+		// invalidation refreshes the header cart badge.
 		return { success: true as const };
 	}
 };

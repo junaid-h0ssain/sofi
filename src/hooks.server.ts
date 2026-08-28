@@ -1,37 +1,45 @@
 /**
  * ============================================================================
- * HOOKS — code that runs on EVERY request to the server
+ * HOOKS — runs on EVERY request (now with the split backend)
  * ============================================================================
  *
- * SvelteKit "hooks" are like middleware in other frameworks. This handle
- * function wraps every incoming request and can inspect/modify it.
- *
- * Two jobs here:
- *   1. Load the current user's session (from their session cookie) and expose
- *      it as `event.locals` — a per-request scratchpad available everywhere
- *      on the server, including load functions and form actions.
- *   2. Let better-auth handle its own endpoints under /api/auth/*.
+ * Two jobs:
+ *   1. Resolve the signed-in user by asking the AUTH SERVICE to validate the
+ *      browser's better-auth cookie. The result goes into event.locals so all
+ *      server code can read `locals.user` and `locals.sessionToken`.
+ *   2. /api/auth/* requests never reach this logic — they are handled by the
+ *      dedicated proxy route (routes/api/auth/[...path]).
  */
 import type { Handle } from '@sveltejs/kit';
-import { building } from '$app/environment';
-import { auth } from '$lib/server/auth';
-import { svelteKitHandler } from 'better-auth/svelte-kit';
+import { getSessionFromCookieHeader } from '$lib/server/auth-proxy';
 
-const handleBetterAuth: Handle = async ({ event, resolve }) => {
-	// Read the session cookie and ask better-auth who this is.
-	// `session.user` = row from the user table, `session.session` = token info.
-	const session = await auth.api.getSession({ headers: event.request.headers });
+export const handle: Handle = async ({ event, resolve }) => {
+	const cookieHeader = event.request.headers.get('cookie') ?? '';
 
-	if (session) {
-		// From here on, every server-side file can do:
-		//   const user = event.locals.user  // undefined if not signed in
-		event.locals.session = session.session;
-		event.locals.user = session.user;
+	if (cookieHeader) {
+		try {
+			const session = await getSessionFromCookieHeader(cookieHeader);
+			if (session) {
+				event.locals.user = {
+					id: session.user.id,
+					name: session.user.name,
+					email: session.user.email,
+					image: session.user.image ?? null,
+					emailVerified: Boolean(session.user.emailVerified),
+					createdAt: session.user.createdAt ?? new Date().toISOString(),
+					updatedAt: session.user.updatedAt ?? new Date().toISOString(),
+					role: session.user.role ?? null,
+					banned: session.user.banned ?? null
+				};
+				// Plain (unsigned) session token — forwarded to the .NET API as
+				// `Authorization: Bearer <token>` on every server-side call.
+				event.locals.sessionToken = session.token;
+			}
+		} catch {
+			// Auth service unreachable → treat as anonymous instead of failing
+			// the whole site; public pages still work.
+		}
 	}
 
-	// Pass control on: better-auth serves /api/auth routes,
-	// everything else continues through the normal SvelteKit pipeline.
-	return svelteKitHandler({ event, resolve, auth, building });
+	return resolve(event);
 };
-
-export const handle: Handle = handleBetterAuth;

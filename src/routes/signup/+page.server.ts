@@ -1,13 +1,11 @@
 /**
- * SIGNUP PAGE — server side.
- * Validates the form manually (no external validation library needed) and
- * hands the values to better-auth, which hashes the password and creates
- * the user row.
+ * SIGNUP PAGE — server side (BFF to the auth service).
+ * Validates the form manually, then hands values to better-auth which hashes
+ * the password and creates the user row.
  */
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { APIError } from 'better-auth/api';
-import { auth } from '$lib/server/auth';
+import { authFetch, applySetCookies } from '$lib/server/auth-proxy';
 import { env } from '$env/dynamic/private';
 
 export const load: PageServerLoad = async (event) => {
@@ -30,22 +28,23 @@ export const actions: Actions = {
 		if (password.length < 8)
 			return fail(400, { message: 'Password must be at least 8 characters', email, name });
 
-		try {
-			await auth.api.signUpEmail({ body: { name, email, password } });
-		} catch (error) {
-			if (error instanceof APIError) {
-				// better-auth answers 422 when the email is already registered.
-				return fail(400, {
-					message:
-						error.status === 422 ? 'An account with this email already exists' : 'Registration failed',
-					email,
-					name
-				});
-			}
-			return fail(500, { message: 'Unexpected error, please try again', email, name });
+		const res = await authFetch('/api/auth/sign-up/email', {
+			method: 'POST',
+			body: JSON.stringify({ name, email, password })
+		});
+
+		if (!res.ok) {
+			// better-auth answers 422 when the email is already registered.
+			return fail(400, {
+				message: res.status === 422 ? 'An account with this email already exists' : 'Registration failed',
+				email,
+				name
+			});
 		}
 
-		// Account created AND signed in (better-auth sets the session cookie).
+		// Account created AND signed in — transfer session cookies.
+		applySetCookies(event.cookies, res.headers.getSetCookie());
+
 		redirect(302, '/');
 	},
 
@@ -54,11 +53,16 @@ export const actions: Actions = {
 	 * account automatically on first login (and signs into an existing one).
 	 */
 	github: async () => {
-		const result = await auth.api.signInSocial({
-			body: { provider: 'github', callbackURL: '/' }
+		const res = await authFetch('/api/auth/sign-in/social', {
+			method: 'POST',
+			body: JSON.stringify({ provider: 'github', callbackURL: '/' })
 		});
-		// Send the browser to GitHub's consent screen.
-		if (result.url) redirect(302, result.url);
+
+		if (!res.ok) return fail(400, { message: 'GitHub sign-up failed' });
+
+		const data = await res.json();
+		if (data?.url) redirect(302, data.url);
+
 		return fail(400, { message: 'GitHub sign-up failed' });
 	}
 };

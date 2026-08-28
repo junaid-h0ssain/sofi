@@ -1,52 +1,52 @@
 /**
- * ADMIN CATEGORIES — same CRUD pattern as brands (see that file for details).
+ * ADMIN CATEGORIES — same CRUD pattern as brands.
  * Category slugs also drive which placeholder image is shown.
  */
-import { asc, count, eq } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { db } from '$lib/server/db';
-import { category, product } from '$lib/server/db/schema';
-import { slugify } from '$lib/utils/slug';
+import { requireAdmin } from '$lib/server/guard';
+import { ApiClientError, adminApi } from '$lib/server/api';
 
-export const load: PageServerLoad = async () => {
-	const categories = await db
-		.select({ id: category.id, name: category.name, slug: category.slug, productCount: count(product.id) })
-		.from(category)
-		.leftJoin(product, eq(product.categoryId, category.id))
-		.groupBy(category.id)
-		.orderBy(asc(category.name));
-
+export const load: PageServerLoad = async (event) => {
+	requireAdmin(event.locals);
+	const categories = await adminApi.categories.list(event.locals.sessionToken!);
 	return { categories };
 };
 
 export const actions: Actions = {
-	create: async ({ request }) => {
-		const formData = await request.formData();
+	create: async (event) => {
+		requireAdmin(event.locals);
+		const token = event.locals.sessionToken!;
+
+		const formData = await event.request.formData();
 		const name = String(formData.get('name') ?? '').trim();
 		if (!name) return fail(400, { message: 'Name is required' });
 
-		const slug = slugify(name);
-		if (!slug) return fail(400, { message: 'Name must contain letters or numbers' });
-
 		try {
-			await db.insert(category).values({ id: crypto.randomUUID(), name, slug });
-		} catch {
-			return fail(400, { message: 'A category with this name already exists' });
+			await adminApi.categories.create(token, name);
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : 'Could not create category';
+			return fail(400, { message });
 		}
 
 		return { success: true };
 	},
 
-	delete: async ({ request }) => {
-		const formData = await request.formData();
+	delete: async (event) => {
+		requireAdmin(event.locals);
+		const token = event.locals.sessionToken!;
+
+		const formData = await event.request.formData();
 		const id = String(formData.get('id') ?? '');
 		if (!id) return fail(400, { message: 'Missing id' });
 
 		try {
-			await db.delete(category).where(eq(category.id, id));
-		} catch {
-			return fail(400, { message: 'Cannot delete a category that still has products' });
+			await adminApi.categories.delete(token, id);
+		} catch (err) {
+			const message =
+				err instanceof ApiClientError ? err.message : 'Could not delete category';
+			return fail(400, { message });
 		}
 
 		return { success: true };

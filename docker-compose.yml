@@ -1,0 +1,64 @@
+# ============================================================================
+# DEV ORCHESTRATION — three services, ONE shared remote Neon database.
+#
+#   web   → SvelteKit (SSR + BFF)      http://localhost:5173
+#   auth  → better-auth (Hono + Bun)   http://localhost:4000  (proxied by web)
+#   api   → SoFi.Api (.NET 10)         http://localhost:5080
+#
+# NOTE: there is NO postgres service here on purpose — Neon is a REMOTE
+# serverless database; every service connects out to it via DATABASE_URL
+# from the root .env (compose interpolates ${…} from that file automatically).
+#
+# Usage:  docker compose up        # first run also installs/migrates/seeds
+# ============================================================================
+
+services:
+  auth:
+    image: oven/bun:1
+    working_dir: /app
+    volumes:
+      - ./auth:/app
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      ORIGIN: ${ORIGIN:-http://localhost:5173}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    command: sh -c "bun install && bun run src/index.ts"
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"await fetch('http://127.0.0.1:4000/health')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend/src/SoFi.Api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development # enables auto-migrate + seed
+      DATABASE_URL: ${DATABASE_URL}
+      WEB_ORIGIN: ${ORIGIN:-http://localhost:5173}
+    ports:
+      - "5080:5080"
+    depends_on:
+      auth:
+        condition: service_healthy # FKs reference the user table → push auth schema first
+
+  web:
+    image: oven/bun:1
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules # anonymous volume: keep container deps separate from host's
+    environment:
+      DATABASE_URL: ${DATABASE_URL} # legacy scripts only; runtime uses HTTP calls
+      ORIGIN: http://localhost:5173
+      AUTH_SERVICE_URL: http://auth:4000 # server-to-server via compose network
+      PRIVATE_API_URL: http://api:5080
+    command: sh -c "bun install && bun run dev --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+      - auth
